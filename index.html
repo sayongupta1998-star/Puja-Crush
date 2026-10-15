@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Puja Crush 🌺</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 15px;
+  text-align: center;
+  font-family: Arial, sans-serif;
+  color: white;
+  background: linear-gradient(135deg, #210b38, #6a1b72, #c52c65);
+  min-height: 100vh;
+}
+
+h1 {
+  color: #ffe082;
+  font-size: 34px;
+  margin-bottom: 5px;
+  text-shadow: 0 0 15px #ff9800;
+}
+
+.subtitle {
+  margin-top: 5px;
+  color: #ffe8f0;
+}
+
+.game {
+  width: 100%;
+  max-width: 460px;
+  margin: 20px auto;
+  padding: 15px;
+  border-radius: 22px;
+  background: #ffffff17;
+  border: 1px solid #ffffff35;
+  box-shadow: 0 10px 35px #0005;
+}
+
+.stats {
+  display: flex;
+  justify-content: space-around;
+  gap: 5px;
+  margin-bottom: 15px;
+}
+
+.stat {
+  flex: 1;
+  padding: 10px 3px;
+  background: #260d40;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+.stat strong {
+  display: block;
+  color: #ffe082;
+  font-size: 22px;
+  margin-top: 5px;
+}
+
+#board {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 4px;
+  width: 100%;
+  touch-action: manipulation;
+}
+
+.tile {
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid #ffffff40;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #ffffff35, #ffffff0c);
+  font-size: clamp(20px, 6vw, 32px);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  transition: transform 0.15s, background 0.15s;
+}
+
+.tile.selected {
+  background: #ffcc80;
+  outline: 3px solid white;
+  transform: scale(.9);
+}
+
+.tile.pop {
+  animation: pop .22s ease;
+}
+
+@keyframes pop {
+  50% {
+    transform: scale(1.25);
+    filter: brightness(2);
+  }
+}
+
+button.control {
+  border: none;
+  border-radius: 25px;
+  padding: 12px 18px;
+  margin: 10px 3px 0;
+  font-size: 15px;
+  font-weight: bold;
+  color: #4a123d;
+  background: linear-gradient(135deg, #ffe082, #ffb300);
+  cursor: pointer;
+}
+
+button.control:active {
+  transform: scale(.96);
+}
+
+#message {
+  min-height: 28px;
+  margin: 14px 0 4px;
+  color: #ffe082;
+  font-weight: bold;
+}
+
+.instructions {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #ffe8f0;
+}
+
+footer {
+  font-size: 12px;
+  color: #f7d8ff;
+  margin: 20px 0;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>🌺 Puja Crush 🌺</h1>
+<p class="subtitle">দুর্গাপুজোর Match-3 Challenge 🪔</p>
+
+<div class="game">
+
+  <div class="stats">
+    <div class="stat">
+      ⭐ স্কোর
+      <strong id="score">0</strong>
+    </div>
+
+    <div class="stat">
+      ⏱️ সময়
+      <strong id="time">60</strong>
+    </div>
+
+    <div class="stat">
+      🏆 লেভেল
+      <strong id="level">1</strong>
+    </div>
+  </div>
+
+  <div id="board"></div>
+
+  <p id="message">
+    শুরু করো এবং একই রকম ৩টি চিহ্ন মেলাও!
+  </p>
+
+  <button class="control" id="startBtn">
+    🎮 শুরু করো
+  </button>
+
+  <button class="control" id="restartBtn">
+    🔄 আবার খেলো
+  </button>
+
+  <button class="control" id="soundBtn">
+    🔊 সাউন্ড: বন্ধ
+  </button>
+
+  <p class="instructions">
+    কীভাবে খেলবে?<br>
+    ১. পাশাপাশি দুটি টাইল নির্বাচন করো।<br>
+    ২. একই রকম ৩টি বা তার বেশি চিহ্ন মেলাও।<br>
+    ৩. প্রতিটি মিলের জন্য পয়েন্ট পাবে।<br>
+    ৪. লক্ষ্য পূরণ করে পরের লেভেলে যাও!
+  </p>
+
+</div>
+
+<footer>
+  শুভ দুর্গাপুজো ❤️🌺
+</footer>
+
+<script>
+const SIZE = 8;
+
+const SYMBOLS = [
+  "🌺",
+  "🪔",
+  "🥁",
+  "🌸",
+  "🪷",
+  "✨"
+];
+
+const TARGET = 300;
+
+let board = [];
+let score = 0;
+let time = 60;
+let level = 1;
+
+let running = false;
+let busy = false;
+let selected = null;
+let timer = null;
+let soundOn = false;
+let audioContext = null;
+
+const boardEl = document.getElementById("board");
+const scoreEl = document.getElementById("score");
+const timeEl = document.getElementById("time");
+const levelEl = document.getElementById("level");
+const messageEl = document.getElementById("message");
+
+function randomSymbol() {
+  return Math.floor(Math.random() * SYMBOLS.length);
+}
+
+function createBoard() {
+  board = Array.from(
+    { length: SIZE },
+    () => Array(SIZE).fill(0)
+  );
+
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      let value;
+      let attempts = 0;
+
+      do {
+        value = randomSymbol();
+        attempts++;
+      } while (
+        attempts < 30 &&
+        (
+          (
+            c >= 2 &&
+            board[r][c - 1] === value &&
+            board[r][c - 2] === value
+          ) ||
+          (
+            r >= 2 &&
+            board[r - 1][c] === value &&
+            board[r - 2][c] === value
+          )
+        )
+      );
+
+      board[r][c] = value;
+    }
+  }
+
+  selected = null;
+  render();
+}
+
+function render() {
+  boardEl.innerHTML = "";
+
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const tile = document.createElement("button");
+
+      tile.className = "tile";
+
+      if (
+        selected &&
+        selected.r === r &&
+        selected.c === c
+      ) {
+        tile.classList.add("selected");
+      }
+
+      tile.textContent = SYMBOLS[board[r][c]];
+      tile.setAttribute("aria-label", SYMBOLS[board[r][c]]);
+      tile.setAttribute("type", "button");
+
+      tile.addEventListener("click", () => {
+        handleTap(r, c);
+      });
+
+      boardEl.appendChild(tile);
+    }
+  }
+
+  scoreEl.textContent = score;
+  timeEl.textContent = time;
+  levelEl.textContent = level;
+}
+
+function handleTap(r, c) {
+  if (!running || busy) return;
+
+  if (!selected) {
+    selected = { r, c };
+    render();
+    return;
+  }
+
+  if (selected.r === r && selected.c === c) {
+    selected = null;
+    render();
+    return;
+  }
+
+  const distance =
+    Math.abs(selected.r - r) +
+    Math.abs(selected.c - c);
+
+  if (distance !== 1) {
+    selected = { r, c };
+    render();
+    return;
+  }
+
+  const previous = selected;
+  selected = null;
+
+  [
+    board[previous.r][previous.c],
+    board[r][c]
+  ] = [
+    board[r][c],
+    board[previous.r][previous.c]
+  ];
+
+  const matches = findMatches();
+
+  if (matches.size === 0) {
+    [
+      board[previous.r][previous.c],
+      board[r][c]
+    ] = [
+      board[r][c],
+      board[previous.r][previous.c]
+    ];
+
+    messageEl.textContent =
+      "মিল হলো না! অন্য চাল চেষ্টা করো 🌸";
+
+    render();
+    return;
+  }
+
+  render();
+  clearMatches(matches, 1);
+}
+
+function findMatches() {
+  const matches = new Set();
+
+  // Horizontal matches
+  for (let r = 0; r < SIZE; r++) {
+    let start = 0;
+
+    for (let c = 1; c <= SIZE; c++) {
+      if (
+        c < SIZE &&
+        board[r][c] === board[r][start]
+      ) {
+        continue;
+      }
+
+      if (c - start >= 3) {
+        for (let k = start; k < c; k++) {
+          matches.add(`${r},${k}`);
+        }
+      }
+
+      start = c;
+    }
+  }
+
+  // Vertical matches
+  for (let c = 0; c < SIZE; c++) {
+    let start = 0;
+
+    for (let r = 1; r <= SIZE; r++) {
+      if (
+        r < SIZE &&
+        board[r][c] === board[start][c]
+      ) {
+        continue;
+      }
+
+      if (r - start >= 3) {
+        for (let k = start; k < r; k++) {
+          matches.add(`${k},${c}`);
+        }
+      }
+
+      start = r;
+    }
+  }
+
+  return matches;
+}
+
+function playSound(frequency = 650) {
+  if (!soundOn) return;
+
+  try {
+    audioContext = audioContext ||
+      new (window.AudioContext || window.webkitAudioContext)();
+
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+
+    oscillator.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.08, audioContext.currentTime);
+    gain.gain.exponentialRampToValueAtTime(
+      0.001,
+      audioContext.currentTime + 0.12
+    );
+
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.12);
+  } catch (error) {
+    // Sound is optional.
+  }
+}
+
+function clearMatches(matches, combo) {
+  if (!matches.size) {
+    busy = false;
+    render();
+    return;
+  }
+
+  busy = true;
+
+  let points = matches.size * 10;
+
+  if (matches.size >= 4) {
+    points += 50;
+  }
+
+  if (matches.size >= 5) {
+    points += 100;
+  }
+
+  if (combo > 1) {
+    points += combo * 25;
+  }
+
+  score += points;
+
+  messageEl.textContent =
+    combo > 1
+      ? `💥 Combo x${combo}! +${points} পয়েন্ট!`
+      : `✨ দারুণ মিল! +${points} পয়েন্ট!`;
+
+  playSound(500 + combo * 120);
+
+  matches.forEach(key => {
+    const [r, c] = key.split(",").map(Number);
+    board[r][c] = -1;
+  });
+
+  render();
+
+  setTimeout(() => {
+    // Drop remaining symbols down.
+    for (let c = 0; c < SIZE; c++) {
+      let write = SIZE - 1;
+
+      for (let r = SIZE - 1; r >= 0; r--) {
+        if (board[r][c] !== -1) {
+          board[write][c] = board[r][c];
+          write--;
+        }
+      }
+
+      while (write >= 0) {
+        board[write][c] = randomSymbol();
+        write--;
+      }
+    }
+
+    render();
+
+    const nextMatches = findMatches();
+
+    if (nextMatches.size > 0) {
+      clearMatches(nextMatches, combo + 1);
+    } else {
+      busy = false;
+
+      if (score >= TARGET * level) {
+        nextLevel();
+      }
+    }
+  }, 220);
+}
+
+function nextLevel() {
+  if (!running) return;
+
+  level++;
+
+  if (level > 5) {
+    endGame(true);
+    return;
+  }
+
+  time = Math.min(time + 8, 60);
+
+  messageEl.textContent =
+    `🎊 লেভেল ${level}! বোনাস ৮ সেকেন্ড!`;
+
+  playSound(900);
+  render();
+}
+
+function startGame() {
+  clearInterval(timer);
+
+  score = 0;
+  time = 60;
+  level = 1;
+  running = true;
+  busy = false;
+  selected = null;
+
+  createBoard();
+
+  messageEl.textContent =
+    "চলো! তিনটি একই চিহ্ন মেলাও! 🌺";
+
+  timer = setInterval(() => {
+    if (!running) return;
+
+    time--;
+    timeEl.textContent = time;
+
+    if (time <= 0) {
+      endGame(false);
+    }
+  }, 1000);
+}
+
+function endGame(completed) {
+  running = false;
+  busy = false;
+
+  clearInterval(timer);
+
+  messageEl.textContent = completed
+    ? `🏆 অসাধারণ! তুমি সব লেভেল জিতেছ! স্কোর: ${score}`
+    : `⏰ সময় শেষ! তোমার স্কোর: ${score}`;
+
+  document.getElementById("startBtn").textContent =
+    "🎮 আবার শুরু করো";
+
+  playSound(completed ? 950 : 250);
+}
+
+document.getElementById("startBtn").addEventListener(
+  "click",
+  startGame
+);
+
+document.getElementById("restartBtn").addEventListener(
+  "click",
+  startGame
+);
+
+document.getElementById("soundBtn").addEventListener(
+  "click",
+  () => {
+    soundOn = !soundOn;
+
+    document.getElementById("soundBtn").textContent =
+      soundOn ? "🔊 সাউন্ড: চালু" : "🔊 সাউন্ড: বন্ধ";
+
+    playSound();
+  }
+);
+
+// Show a board before the player starts.
+createBoard();
+</script>
+
+</body>
+  </html>
